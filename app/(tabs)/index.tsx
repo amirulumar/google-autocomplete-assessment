@@ -1,70 +1,72 @@
-import { Image, StyleSheet, Platform } from 'react-native';
+import {
+  NativeSyntheticEvent,
+  StyleSheet,
+  TextInputChangeEventData,
+} from "react-native";
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+import autocompleteJson from "@/assets/data/autocomplete.json";
+import AutocompleteInput from "@/components/AutocompleteInput";
+import { useAppDispatch, useAppSelector } from "@/hooks";
+import { RootState } from "@/redux";
+import { fetchAutocomplete } from "@/redux/api/actions";
+import { addSearchHistory } from "@/redux/search-history/actions";
+import { View } from "@ant-design/react-native";
+import debounce from "lodash.debounce";
+import { useEffect, useRef, useState } from "react";
 
 export default function HomeScreen() {
+  const dispatch = useAppDispatch();
+  const { data, error } = useAppSelector((state: RootState) => state.api);
+  const [autocompleteInput, setAutocompleteInput] = useState<string>("");
+  const [results, setResults] = useState<
+    google.maps.places.AutocompletePrediction[]
+  >([]);
+  const autocompleteInputRef = useRef(null);
+
+  useEffect(() => {
+    if (error || data?.predictions.length === 0) {
+      setResults(autocompleteJson.predictions);
+    }
+  }, [data, error]);
+
+  useEffect(() => {
+    if (autocompleteInput) dispatch(fetchAutocomplete(autocompleteInput));
+  }, [autocompleteInput]);
+
+  const autoComplete = (query: string) => {
+    setAutocompleteInput(query);
+  };
+
+  const debouncedAutoComplete = debounce(autoComplete, 1000);
+
+  const onInputChange = (e: NativeSyntheticEvent<TextInputChangeEventData>) => {
+    debouncedAutoComplete(e.nativeEvent.text);
+  };
+
+  const onResultPress = (item: google.maps.places.AutocompletePrediction) => {
+    setResults([]);
+    dispatch(addSearchHistory(item.description));
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({ ios: 'cmd + d', android: 'cmd + m' })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          Tap the Explore tab to learn more about what's included in this starter app.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          When you're ready, run{' '}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <View style={styles.viewContainer}>
+      <AutocompleteInput
+        ref={autocompleteInputRef}
+        placeholder="Search..."
+        onChange={onInputChange}
+        onResultPress={onResultPress}
+        allowClear
+        results={results}
+        resultValueKey="description"
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  viewContainer: {
+    flex: 1,
+    width: "100%",
+    height: "100%",
   },
 });
